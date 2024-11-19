@@ -1,0 +1,91 @@
+#include <Arduino.h>
+#include <I2S.h>           // For microphone input
+#include <arduinoFFT.h>    // For FFT processing
+#include <TensorFlowLite.h> // For AI model integration
+
+// Constants
+#define I2S_WS 15          // Word Select pin
+#define I2S_SCK 14         // Serial Clock pin
+#define I2S_SD 13          // Serial Data pin
+#define SAMPLES 256        // FFT sample size
+#define NOISE_THRESHOLD 1000 // Looping noise threshold
+
+// FFT Setup
+arduinoFFT FFT = arduinoFFT();
+double vReal[SAMPLES];
+double vImag[SAMPLES];
+
+// Placeholder for AI model
+const uint8_t* model_data = nullptr; // Add TensorFlow Lite model array here
+tflite::MicroErrorReporter error_reporter;
+tflite::MicroInterpreter* interpreter = nullptr;
+float ai_input[SAMPLES];
+
+// Function to configure I2S
+void setupI2S() {
+  I2S.begin(I2S_PHILIPS_MODE, 44100, 16);
+  I2S.setPins(I2S_WS, I2S_SCK, I2S_SD);
+}
+
+// Function to configure AI model
+void setupAIModel() {
+  // TensorFlow Lite Model initialization
+  tflite::MicroInterpreter* interpreter = nullptr;
+  // Add model loading code here
+}
+
+// Function to capture audio samples
+void captureAudio() {
+  for (int i = 0; i < SAMPLES; i++) {
+    int32_t sample = I2S.read();
+    vReal[i] = sample / 32768.0; // Normalize
+    vImag[i] = 0.0;              // Imaginary part
+  }
+}
+
+// Function to process audio
+void processAudio() {
+  FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+  FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
+  FFT.MajorPeak(vReal, SAMPLES); // Identify peak frequency
+
+  // Pass data to AI model for noise cancellation (Placeholder)
+  for (int i = 0; i < SAMPLES; i++) {
+    ai_input[i] = vReal[i];
+  }
+  // Inference placeholder
+  // float result = interpreter->Invoke();
+}
+
+// Function to control amplifier
+void adjustAmplifier(bool noiseDetected) {
+  if (noiseDetected) {
+    analogWrite(5, 0); // Mute the amplifier
+  } else {
+    analogWrite(5, 128); // Normal operation
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  setupI2S();
+  setupAIModel();
+  pinMode(5, OUTPUT); // Amplifier control pin
+}
+
+void loop() {
+  captureAudio();
+  processAudio();
+  bool noiseDetected = false;
+
+  // Check noise threshold
+  for (int i = 0; i < SAMPLES; i++) {
+    if (vReal[i] > NOISE_THRESHOLD) {
+      noiseDetected = true;
+      break;
+    }
+  }
+
+  adjustAmplifier(noiseDetected);
+  delay(10);
+}
